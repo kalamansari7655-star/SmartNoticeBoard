@@ -13,7 +13,8 @@ app = Flask(__name__)
 app.secret_key = "supersecretkey"
 
 # ---------------- MongoDB Setup ----------------
-client = MongoClient("mongodb+srv://abdul_user:UjnXHGbOCcPHmYnT@cluster0.za7bzvm.mongodb.net/?appName=Cluster0")
+MONGO_URI = os.getenv("MONGO_URI")
+client = MongoClient(MONGO_URI )
 db = client["smart_notice_board"]
 users_collection = db["users"]
 notices_collection = db["notices"]
