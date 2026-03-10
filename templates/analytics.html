@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Analytics | Smart Notice Board</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Tailwind -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Anime.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        * {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 50%, #0f1419 100%);
+            overflow-x: hidden;
+        }
+
+        .mono {
+            font-family: 'Space Mono', monospace;
+        }
+
+        #bgCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 0;
+            opacity: 0.4;
+        }
+
+        .sidebar {
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .sidebar-hidden {
+            transform: translateX(-100%);
+        }
+
+        @media (min-width: 768px) {
+            .sidebar-hidden {
+                transform: translateX(0);
+            }
+        }
+
+        .glass-morphism {
+            backdrop-filter: blur(10px);
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid rgba(100, 255, 218, 0.1);
+        }
+
+        .sidebar-link {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .sidebar-link::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 3px;
+            background: linear-gradient(180deg, #64ffda, #38bdf8);
+            transform: scaleY(0);
+            transition: transform 0.3s ease;
+        }
+
+        .sidebar-link:hover::before,
+        .sidebar-link.active::before {
+            transform: scaleY(1);
+        }
+
+        .stats-card {
+            background: linear-gradient(135deg, rgba(100, 255, 218, 0.1) 0%, rgba(56, 189, 248, 0.1) 100%);
+            border: 1px solid rgba(100, 255, 218, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .stats-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 30px rgba(100, 255, 218, 0.2);
+        }
+
+        .chart-container {
+            backdrop-filter: blur(20px);
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(100, 255, 218, 0.2);
+        }
+
+        .activity-item {
+            backdrop-filter: blur(20px);
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(100, 255, 218, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .activity-item:hover {
+            border-color: rgba(100, 255, 218, 0.3);
+            transform: translateX(4px);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.5);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, #64ffda, #38bdf8);
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="text-white min-h-screen">
+
+<!-- Animated Canvas Background -->
+<canvas id="bgCanvas"></canvas>
+
+<!-- Mobile Menu Toggle -->
+<button id="menuToggle" class="md:hidden fixed top-4 left-4 z-50 p-3 rounded-xl glass-morphism hover:bg-cyan-500/20 transition">
+    <i data-lucide="menu" class="w-6 h-6"></i>
+</button>
+
+<!-- Sidebar -->
+<aside id="sidebar" class="sidebar fixed left-0 top-0 h-screen w-72 glass-morphism z-40 overflow-y-auto">
+    <div class="p-6">
+        <!-- Logo -->
+        <div class="flex items-center gap-3 mb-8">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center">
+                <i data-lucide="layout-dashboard" class="w-6 h-6 text-white"></i>
+            </div>
+            <div>
+                <h2 class="text-xl font-bold text-cyan-400 mono">SmartBoard</h2>
+                <p class="text-xs text-gray-400">Digital Notice Hub</p>
+            </div>
+        </div>
+
+        <!-- User Info -->
+        <div class="mb-6 p-4 rounded-xl bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border border-cyan-500/20">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center text-lg font-bold">
+                    {{ current_user.username[0].upper() }}
+                </div>
+                <div class="flex-1">
+                    <p class="font-semibold text-white">{{ current_user.username }}</p>
+                    <span class="text-xs px-2 py-1 rounded-full bg-red-500/20 text-red-300">
+                        Admin
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="space-y-2">
+            <a href="/" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-cyan-500/10 transition">
+                <i data-lucide="home" class="w-5 h-5"></i>
+                <span class="font-medium">Dashboard</span>
+            </a>
+
+            <a href="/post" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-cyan-500/10 transition">
+                <i data-lucide="plus-circle" class="w-5 h-5"></i>
+                <span class="font-medium">Post Notice</span>
+            </a>
+
+            <a href="/my-notices" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-cyan-500/10 transition">
+                <i data-lucide="file-text" class="w-5 h-5"></i>
+                <span class="font-medium">My Notices</span>
+            </a>
+
+            <a href="/archive" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-cyan-500/10 transition">
+                <i data-lucide="archive" class="w-5 h-5"></i>
+                <span class="font-medium">Archive</span>
+            </a>
+
+            <a href="/calendar" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-cyan-500/10 transition">
+                <i data-lucide="calendar" class="w-5 h-5"></i>
+                <span class="font-medium">Calendar</span>
+            </a>
+
+            <a href="/analytics" class="sidebar-link active flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-cyan-500/10 transition">
+                <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
+                <span class="font-medium">Analytics</span>
+            </a>
+
+            <a href="/users" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-cyan-500/10 transition">
+                <i data-lucide="users" class="w-5 h-5"></i>
+                <span class="font-medium">Manage Users</span>
+            </a>
+
+            <a href="/settings" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-cyan-500/10 transition">
+                <i data-lucide="settings" class="w-5 h-5"></i>
+                <span class="font-medium">Settings</span>
+            </a>
+        </nav>
+
+        <!-- Admin Badge -->
+        <div class="mt-8 p-4 rounded-xl bg-gradient-to-br from-red-500/10 to-pink-500/10 border border-red-500/20">
+            <h3 class="text-sm font-semibold text-red-300 mb-2 flex items-center gap-2">
+                <i data-lucide="shield" class="w-4 h-4"></i>
+                Admin Access
+            </h3>
+            <p class="text-xs text-gray-300">
+                You have full access to all analytics and system data.
+            </p>
+        </div>
+
+        <!-- Logout -->
+        <a href="/logout" class="mt-6 flex items-center gap-3 px-4 py-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 transition border border-red-500/20">
+            <i data-lucide="log-out" class="w-5 h-5"></i>
+            <span class="font-medium">Logout</span>
+        </a>
+    </div>
+</aside>
+
+<!-- Main Content -->
+<main class="md:ml-72 relative z-10">
+    
+    <!-- Top Bar -->
+    <div class="glass-morphism sticky top-0 z-30 p-4 mb-6">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">
+                    Analytics Dashboard
+                </h1>
+                <p class="text-gray-400 text-sm mt-1">System insights and performance metrics</p>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <button class="px-4 py-2 rounded-xl glass-morphism hover:bg-cyan-500/10 transition text-sm font-medium">
+                    <i data-lucide="download" class="w-4 h-4 inline mr-1"></i>
+                    Export Report
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overview Stats -->
+    <div class="max-w-7xl mx-auto px-6 mb-8">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="stats-card p-6 rounded-2xl">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-400 text-sm mb-1">Total Users</p>
+                        <p class="text-3xl font-bold text-cyan-400">{{ stats.total_users }}</p>
+                        <p class="text-xs text-green-400 mt-1">↑ 12% this month</p>
+                    </div>
+                    <div class="w-14 h-14 rounded-xl bg-cyan-500/20 flex items-center justify-center">
+                        <i data-lucide="users" class="w-7 h-7 text-cyan-400"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stats-card p-6 rounded-2xl">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-400 text-sm mb-1">Total Notices</p>
+                        <p class="text-3xl font-bold text-green-400">{{ stats.total_notices }}</p>
+                        <p class="text-xs text-green-400 mt-1">↑ 8% this week</p>
+                    </div>
+                    <div class="w-14 h-14 rounded-xl bg-green-500/20 flex items-center justify-center">
+                        <i data-lucide="file-text" class="w-7 h-7 text-green-400"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stats-card p-6 rounded-2xl">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-400 text-sm mb-1">Total Activities</p>
+                        <p class="text-3xl font-bold text-purple-400">{{ stats.total_activities }}</p>
+                        <p class="text-xs text-purple-400 mt-1">Last 30 days</p>
+                    </div>
+                    <div class="w-14 h-14 rounded-xl bg-purple-500/20 flex items-center justify-center">
+                        <i data-lucide="activity" class="w-7 h-7 text-purple-400"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stats-card p-6 rounded-2xl">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-400 text-sm mb-1">Active Today</p>
+                        <p class="text-3xl font-bold text-orange-400">{{ stats.users_by_role.values()|sum }}</p>
+                        <p class="text-xs text-orange-400 mt-1">All roles</p>
+                    </div>
+                    <div class="w-14 h-14 rounded-xl bg-orange-500/20 flex items-center justify-center">
+                        <i data-lucide="trending-up" class="w-7 h-7 text-orange-400"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Section -->
+    <div class="max-w-7xl mx-auto px-6 mb-8">
+        <div class="grid lg:grid-cols-2 gap-6">
+            
+            <!-- Users by Role Chart -->
+            <div class="chart-container p-6 rounded-2xl">
+                <h3 class="text-xl font-bold text-cyan-400 mb-4 flex items-center gap-2">
+                    <i data-lucide="users" class="w-5 h-5"></i>
+                    Users by Role
+                </h3>
+                <canvas id="userRoleChart" height="250"></canvas>
+            </div>
+
+            <!-- Notices by Category Chart -->
+            <div class="chart-container p-6 rounded-2xl">
+                <h3 class="text-xl font-bold text-cyan-400 mb-4 flex items-center gap-2">
+                    <i data-lucide="pie-chart" class="w-5 h-5"></i>
+                    Notices by Category
+                </h3>
+                <canvas id="categoryChart" height="250"></canvas>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Daily Posts Chart -->
+    <div class="max-w-7xl mx-auto px-6 mb-8">
+        <div class="chart-container p-6 rounded-2xl">
+            <h3 class="text-xl font-bold text-cyan-400 mb-4 flex items-center gap-2">
+                <i data-lucide="trending-up" class="w-5 h-5"></i>
+                Daily Notice Posts (Last 7 Days)
+            </h3>
+            <canvas id="dailyPostsChart" height="100"></canvas>
+        </div>
+    </div>
+
+    <!-- Recent Activities -->
+    <div class="max-w-7xl mx-auto px-6 pb-12">
+        <div class="chart-container p-6 rounded-2xl">
+            <h3 class="text-xl font-bold text-cyan-400 mb-4 flex items-center gap-2">
+                <i data-lucide="activity" class="w-5 h-5"></i>
+                Recent Activities
+            </h3>
+
+            <div class="space-y-3 max-h-96 overflow-y-auto">
+                {% for activity in stats.recent_activities %}
+                <div class="activity-item p-4 rounded-xl">
+                    <div class="flex items-center gap-4">
+                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center font-bold text-sm flex-shrink-0">
+                            {{ activity.user[0].upper() }}
+                        </div>
+                        <div class="flex-1">
+                            <p class="text-white font-medium">
+                                <span class="text-cyan-300">{{ activity.user }}</span>
+                                <span class="text-gray-400">{{ activity.action.replace('_', ' ') }}</span>
+                            </p>
+                            <p class="text-xs text-gray-500">
+                                {{ activity.timestamp.strftime('%d %b %Y, %I:%M %p') }}
+                            </p>
+                        </div>
+                        <div class="flex-shrink-0">
+                            {% if activity.action == 'post_notice' %}
+                                <i data-lucide="file-plus" class="w-5 h-5 text-green-400"></i>
+                            {% elif activity.action == 'edit_notice' %}
+                                <i data-lucide="edit" class="w-5 h-5 text-yellow-400"></i>
+                            {% elif activity.action == 'delete_notice' %}
+                                <i data-lucide="trash" class="w-5 h-5 text-red-400"></i>
+                            {% elif activity.action == 'user_login' %}
+                                <i data-lucide="log-in" class="w-5 h-5 text-blue-400"></i>
+                            {% else %}
+                                <i data-lucide="activity" class="w-5 h-5 text-purple-400"></i>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+</main>
+
+<!-- Initialize Lucide Icons -->
+<script>
+    lucide.createIcons();
+</script>
+
+<!-- Canvas Particle Background -->
+<script>
+const canvas = document.getElementById("bgCanvas");
+const ctx = canvas.getContext("2d");
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+let particlesArray = [];
+
+class Particle {
+    constructor() {
+        this.x = Math.random() * canvas.width;
+        this.y = Math.random() * canvas.height;
+        this.size = Math.random() * 2 + 0.5;
+        this.speedX = Math.random() * 0.5 - 0.25;
+        this.speedY = Math.random() * 0.5 - 0.25;
+        this.opacity = Math.random() * 0.5 + 0.2;
+    }
+
+    update() {
+        this.x += this.speedX;
+        this.y += this.speedY;
+
+        if (this.x > canvas.width) this.x = 0;
+        if (this.x < 0) this.x = canvas.width;
+        if (this.y > canvas.height) this.y = 0;
+        if (this.y < 0) this.y = canvas.height;
+    }
+
+    draw() {
+        ctx.fillStyle = `rgba(100, 255, 218, ${this.opacity})`;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+function init() {
+    particlesArray = [];
+    for (let i = 0; i < 100; i++) {
+        particlesArray.push(new Particle());
+    }
+}
+
+function animateParticles() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (let i = 0; i < particlesArray.length; i++) {
+        particlesArray[i].update();
+        particlesArray[i].draw();
+    }
+    requestAnimationFrame(animateParticles);
+}
+
+window.addEventListener('resize', () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    init();
+});
+
+init();
+animateParticles();
+</script>
+
+<!-- Charts -->
+<script>
+// Mobile Menu Toggle
+const menuToggle = document.getElementById('menuToggle');
+const sidebar = document.getElementById('sidebar');
+
+menuToggle.addEventListener('click', () => {
+    sidebar.classList.toggle('sidebar-hidden');
+});
+
+// Chart.js Configuration
+Chart.defaults.color = '#94a3b8';
+Chart.defaults.borderColor = 'rgba(100, 255, 218, 0.1)';
+
+// Users by Role Chart
+const userRoleCtx = document.getElementById('userRoleChart').getContext('2d');
+const userRoleChart = new Chart(userRoleCtx, {
+    type: 'doughnut',
+    data: {
+        labels: ['Admin', 'Teacher', 'Student'],
+        datasets: [{
+            data: [
+                {{ stats.users_by_role.admin }},
+                {{ stats.users_by_role.teacher }},
+                {{ stats.users_by_role.student }}
+            ],
+            backgroundColor: [
+                'rgba(239, 68, 68, 0.8)',
+                'rgba(34, 197, 94, 0.8)',
+                'rgba(59, 130, 246, 0.8)'
+            ],
+            borderColor: [
+                'rgba(239, 68, 68, 1)',
+                'rgba(34, 197, 94, 1)',
+                'rgba(59, 130, 246, 1)'
+            ],
+            borderWidth: 2
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: {
+                    color: '#e2e8f0',
+                    padding: 15,
+                    font: {
+                        size: 12
+                    }
+                }
+            }
+        }
+    }
+});
+
+// Notices by Category Chart
+const categoryCtx = document.getElementById('categoryChart').getContext('2d');
+const categoryChart = new Chart(categoryCtx, {
+    type: 'pie',
+    data: {
+        labels: ['Academic', 'Events', 'Urgent', 'General'],
+        datasets: [{
+            data: [
+                {{ stats.notices_by_category.Academic }},
+                {{ stats.notices_by_category.Events }},
+                {{ stats.notices_by_category.Urgent }},
+                {{ stats.notices_by_category.General }}
+            ],
+            backgroundColor: [
+                'rgba(59, 130, 246, 0.8)',
+                'rgba(168, 85, 247, 0.8)',
+                'rgba(239, 68, 68, 0.8)',
+                'rgba(34, 197, 94, 0.8)'
+            ],
+            borderColor: [
+                'rgba(59, 130, 246, 1)',
+                'rgba(168, 85, 247, 1)',
+                'rgba(239, 68, 68, 1)',
+                'rgba(34, 197, 94, 1)'
+            ],
+            borderWidth: 2
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: {
+                    color: '#e2e8f0',
+                    padding: 15,
+                    font: {
+                        size: 12
+                    }
+                }
+            }
+        }
+    }
+});
+
+// Daily Posts Chart
+const dailyPostsCtx = document.getElementById('dailyPostsChart').getContext('2d');
+const dailyPostsChart = new Chart(dailyPostsCtx, {
+    type: 'line',
+    data: {
+        labels: [
+            {% for post in stats.daily_posts|reverse %}
+                '{{ post.date }}'{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ],
+        datasets: [{
+            label: 'Notices Posted',
+            data: [
+                {% for post in stats.daily_posts|reverse %}
+                    {{ post.count }}{% if not loop.last %},{% endif %}
+                {% endfor %}
+            ],
+            borderColor: 'rgba(100, 255, 218, 1)',
+            backgroundColor: 'rgba(100, 255, 218, 0.1)',
+            borderWidth: 3,
+            fill: true,
+            tension: 0.4,
+            pointBackgroundColor: 'rgba(100, 255, 218, 1)',
+            pointBorderColor: '#fff',
+            pointBorderWidth: 2,
+            pointRadius: 5,
+            pointHoverRadius: 7
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+            legend: {
+                display: true,
+                labels: {
+                    color: '#e2e8f0',
+                    font: {
+                        size: 12
+                    }
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    color: '#94a3b8',
+                    stepSize: 1
+                },
+                grid: {
+                    color: 'rgba(100, 255, 218, 0.1)'
+                }
+            },
+            x: {
+                ticks: {
+                    color: '#94a3b8'
+                },
+                grid: {
+                    color: 'rgba(100, 255, 218, 0.1)'
+                }
+            }
+        }
+    }
+});
+
+// Entrance Animations
+anime({
+    targets: '.stats-card',
+    scale: [0.9, 1],
+    opacity: [0, 1],
+    delay: anime.stagger(100),
+    duration: 600,
+    easing: 'easeOutExpo'
+});
+
+anime({
+    targets: '.chart-container',
+    translateY: [30, 0],
+    opacity: [0, 1],
+    delay: anime.stagger(150, {start: 300}),
+    duration: 800,
+    easing: 'easeOutExpo'
+});
+
+anime({
+    targets: '.activity-item',
+    translateX: [-20, 0],
+    opacity: [0, 1],
+    delay: anime.stagger(50, {start: 600}),
+    duration: 600,
+    easing: 'easeOutExpo'
+});
+</script>
+
+</body>
+</html>

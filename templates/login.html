@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Login | Smart Notice Board</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+</head>
+
+<body class="bg-gray-900 flex items-center justify-center min-h-screen overflow-hidden">
+
+<!-- 🌌 Canvas Background -->
+<canvas id="bgCanvas" class="fixed top-0 left-0 w-full h-full -z-10"></canvas>
+
+<!-- 🔐 Login Card -->
+<div class="login-card backdrop-blur-xl bg-white/10 border border-white/20 
+            shadow-2xl rounded-2xl p-8 w-96 text-white">
+
+    <h2 class="text-3xl font-bold text-center mb-6">Welcome Back</h2>
+
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            <div class="bg-red-500 text-white p-2 rounded mb-4 text-sm">
+                {{ messages[0] }}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <form method="POST" class="space-y-4">
+
+        <input type="email" name="email" placeholder="Email"
+            class="w-full px-4 py-2 rounded-lg bg-white/20 
+                   border border-white/30 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            required>
+
+        <input type="password" name="password" placeholder="Password"
+            class="w-full px-4 py-2 rounded-lg bg-white/20 
+                   border border-white/30 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            required>
+
+        <button type="submit"
+            class="w-full bg-blue-600 hover:bg-blue-700 
+                   transition duration-300 py-2 rounded-lg font-semibold">
+            Login
+        </button>
+
+    </form>
+
+    <p class="text-center mt-4 text-sm">
+        Don’t have an account?
+        <a href="{{ url_for('signup') }}" class="text-blue-400 hover:underline">
+            Sign Up
+        </a>
+    </p>
+
+</div>
+
+<!-- ✨ Anime.js Animation -->
+<script>
+anime({
+    targets: '.login-card',
+    translateY: [-80, 0],
+    opacity: [0, 1],
+    duration: 1500,
+    easing: 'easeOutExpo'
+});
+</script>
+
+<!-- 🌌 Canvas Background Script -->
+<script>
+const canvas = document.getElementById("bgCanvas");
+const ctx = canvas.getContext("2d");
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+let particles = [];
+
+for (let i = 0; i < 80; i++) {
+    particles.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        radius: Math.random() * 2 + 1,
+        dx: Math.random() - 0.5,
+        dy: Math.random() - 0.5
+    });
+}
+
+function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "rgba(59,130,246,0.6)";
+
+    particles.forEach(p => {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        p.x += p.dx;
+        p.y += p.dy;
+
+        if (p.x < 0 || p.x > canvas.width) p.dx *= -1;
+        if (p.y < 0 || p.y > canvas.height) p.dy *= -1;
+    });
+
+    requestAnimationFrame(animate);
+}
+
+animate();
+</script>
+
+</body>
+</html>

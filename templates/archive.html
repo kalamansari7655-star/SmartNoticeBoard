@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Archive | Smart Notice Board</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Tailwind -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Anime.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        * {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 50%, #0f1419 100%);
+            overflow-x: hidden;
+        }
+
+        .mono {
+            font-family: 'Space Mono', monospace;
+        }
+
+        #bgCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 0;
+            opacity: 0.4;
+        }
+
+        .sidebar {
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .sidebar-hidden {
+            transform: translateX(-100%);
+        }
+
+        @media (min-width: 768px) {
+            .sidebar-hidden {
+                transform: translateX(0);
+            }
+        }
+
+        .glass-morphism {
+            backdrop-filter: blur(10px);
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid rgba(100, 255, 218, 0.1);
+        }
+
+        .notice-card {
+            backdrop-filter: blur(20px);
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(100, 255, 218, 0.1);
+            transition: all 0.3s ease;
+            opacity: 0.7;
+        }
+
+        .notice-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(100, 255, 218, 0.3);
+            box-shadow: 0 10px 30px rgba(100, 255, 218, 0.1);
+            opacity: 1;
+        }
+
+        .sidebar-link {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .sidebar-link::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 3px;
+            background: linear-gradient(180deg, #64ffda, #38bdf8);
+            transform: scaleY(0);
+            transition: transform 0.3s ease;
+        }
+
+        .sidebar-link:hover::before,
+        .sidebar-link.active::before {
+            transform: scaleY(1);
+        }
+
+        .archived-badge {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(217, 119, 6, 0.2));
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.5);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, #64ffda, #38bdf8);
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="text-white min-h-screen">
+
+<!-- Animated Canvas Background -->
+<canvas id="bgCanvas"></canvas>
+
+<!-- Mobile Menu Toggle -->
+<button id="menuToggle" class="md:hidden fixed top-4 left-4 z-50 p-3 rounded-xl glass-morphism hover:bg-cyan-500/20 transition">
+    <i data-lucide="menu" class="w-6 h-6"></i>
+</button>
+
+<!-- Sidebar -->
+<aside id="sidebar" class="sidebar fixed left-0 top-0 h-screen w-72 glass-morphism z-40 overflow-y-auto">
+    <div class="p-6">
+        <!-- Logo -->
+        <div class="flex items-center gap-3 mb-8">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center">
+                <i data-lucide="layout-dashboard" class="w-6 h-6 text-white"></i>
+            </div>
+            <div>
+                <h2 class="text-xl font-bold text-cyan-400 mono">SmartBoard</h2>
+                <p class="text-xs text-gray-400">Digital Notice Hub</p>
+            </div>
+        </div>
+
+        <!-- User Info -->
+        <div class="mb-6 p-4 rounded-xl bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border border-cyan-500/20">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center text-lg font-bold">
+                    {{ current_user.username[0].upper() }}
+                </div>
+                <div class="flex-1">
+                    <p class="font-semibold text-white">{{ current_user.username }}</p>
+                    <span class="text-xs px-2 py-1 rounded-full
+                        {% if current_user.role == 'admin' %}bg-red-500/20 text-red-300
+                        {% elif current_user.role == 'teacher' %}bg-green-500/20 text-green-300
+                        {% else %}bg-blue-500/20 text-blue-300{% endif %}">
+                        {{ current_user.role | capitalize }}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="space-y-2">
+            <a href="/" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-cyan-500/10 transition">
+                <i data-lucide="home" class="w-5 h-5"></i>
+                <span class="font-medium">Dashboard</span>
+            </a>
+
+            {% if current_user.role in ['admin', 'teacher'] %}
+            <a href="/post" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-cyan-500/10 transition">
+                <i data-lucide="plus-circle" class="w-5 h-5"></i>
+                <span class="font-medium">Post Notice</span>
+            </a>
+            {% endif %}
+
+            <a href="/my-notices" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-cyan-500/10 transition">
+                <i data-lucide="file-text" class="w-5 h-5"></i>
+                <span class="font-medium">My Notices</span>
+            </a>
+
+            <a href="/archive" class="sidebar-link active flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-cyan-500/10 transition">
+                <i data-lucide="archive" class="w-5 h-5"></i>
+                <span class="font-medium">Archive</span>
+            </a>
+
+            <a href="/calendar" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-cyan-500/10 transition">
+                <i data-lucide="calendar" class="w-5 h-5"></i>
+                <span class="font-medium">Calendar</span>
+            </a>
+
+            {% if current_user.role == 'admin' %}
+            <a href="/analytics" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-cyan-500/10 transition">
+                <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
+                <span class="font-medium">Analytics</span>
+            </a>
+
+            <a href="/users" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-cyan-500/10 transition">
+                <i data-lucide="users" class="w-5 h-5"></i>
+                <span class="font-medium">Manage Users</span>
+            </a>
+            {% endif %}
+
+            <a href="/settings" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-cyan-500/10 transition">
+                <i data-lucide="settings" class="w-5 h-5"></i>
+                <span class="font-medium">Settings</span>
+            </a>
+        </nav>
+
+        <!-- Info Card -->
+        <div class="mt-8 p-4 rounded-xl bg-gradient-to-br from-yellow-500/10 to-orange-500/10 border border-yellow-500/20">
+            <h3 class="text-sm font-semibold text-yellow-300 mb-2 flex items-center gap-2">
+                <i data-lucide="info" class="w-4 h-4"></i>
+                Archive Info
+            </h3>
+            <p class="text-xs text-gray-300">
+                Notices older than 30 days or manually archived are stored here. You can restore them anytime.
+            </p>
+        </div>
+
+        <!-- Logout -->
+        <a href="/logout" class="mt-6 flex items-center gap-3 px-4 py-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 transition border border-red-500/20">
+            <i data-lucide="log-out" class="w-5 h-5"></i>
+            <span class="font-medium">Logout</span>
+        </a>
+    </div>
+</aside>
+
+<!-- Main Content -->
+<main class="md:ml-72 relative z-10">
+    
+    <!-- Top Bar -->
+    <div class="glass-morphism sticky top-0 z-30 p-4 mb-6">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500">
+                    Notice Archive
+                </h1>
+                <p class="text-gray-400 text-sm mt-1">View and restore archived notices</p>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <span class="px-4 py-2 rounded-xl bg-yellow-500/20 text-yellow-300 text-sm font-medium">
+                    <i data-lucide="archive" class="w-4 h-4 inline mr-1"></i>
+                    {{ notices|length }} Archived
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notice Grid -->
+    <div class="max-w-7xl mx-auto px-6 pb-12">
+        
+        {% if notices %}
+        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for notice in notices %}
+            <div class="notice-card p-6 rounded-2xl relative">
+                
+                <!-- Archived Badge -->
+                <div class="archived-badge absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-semibold text-yellow-300 flex items-center gap-1">
+                    <i data-lucide="archive" class="w-3 h-3"></i>
+                    Archived
+                </div>
+
+                <!-- Category Badge -->
+                <div class="mb-4">
+                    <span class="px-3 py-1 rounded-full text-xs font-semibold
+                        {% if notice.category == 'Urgent' %}bg-red-500/20 text-red-300
+                        {% elif notice.category == 'Academic' %}bg-blue-500/20 text-blue-300
+                        {% elif notice.category == 'Events' %}bg-purple-500/20 text-purple-300
+                        {% else %}bg-green-500/20 text-green-300{% endif %}">
+                        {{ notice.category if notice.category else 'General' }}
+                    </span>
+                </div>
+
+                <!-- Title -->
+                <h3 class="text-xl font-bold text-white mb-3 line-clamp-2">
+                    {{ notice.title }}
+                </h3>
+
+                <!-- Message -->
+                <p class="text-gray-300 mb-4 line-clamp-3">
+                    {{ notice.message }}
+                </p>
+
+                <!-- Image Preview -->
+                {% if notice.image %}
+                <img src="{{ url_for('static', filename='uploads/' + notice.image) }}"
+                     class="rounded-xl mb-4 w-full h-48 object-cover border border-cyan-500/20 opacity-70">
+                {% endif %}
+
+                <!-- PDF Preview -->
+                {% if notice.pdf %}
+                <a href="{{ url_for('static', filename='uploads/' + notice.pdf) }}"
+                   target="_blank"
+                   class="inline-flex items-center gap-2 bg-blue-500/20 text-blue-300 px-4 py-2 rounded-lg hover:bg-blue-500/30 transition mb-4">
+                    <i data-lucide="file-text" class="w-4 h-4"></i>
+                    View PDF
+                </a>
+                {% endif %}
+
+                <!-- Footer -->
+                <div class="mt-4 pt-4 border-t border-slate-700">
+                    <div class="flex items-center justify-between text-sm mb-4">
+                        <div class="flex items-center gap-2">
+                            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center text-xs font-bold">
+                                {{ notice.posted_by[0].upper() }}
+                            </div>
+                            <div>
+                                <p class="text-cyan-300 font-medium">{{ notice.posted_by }}</p>
+                                <p class="text-gray-500 text-xs">{{ notice.date_posted.strftime('%d %b %Y') }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Restore Button -->
+                    {% if current_user.role == 'admin' or notice.posted_by == current_user.username %}
+                    <a href="/toggle-archive/{{ notice._id }}" 
+                       class="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-green-500 to-emerald-500 px-4 py-2 rounded-lg hover:shadow-lg hover:shadow-green-500/50 transition transform hover:scale-105 font-semibold text-sm">
+                        <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                        Restore Notice
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% else %}
+        <!-- Empty State -->
+        <div class="text-center py-20">
+            <div class="w-24 h-24 mx-auto mb-6 rounded-full bg-slate-800/50 flex items-center justify-center">
+                <i data-lucide="archive" class="w-12 h-12 text-gray-500"></i>
+            </div>
+            <h3 class="text-2xl font-bold text-gray-400 mb-2">No Archived Notices</h3>
+            <p class="text-gray-500 mb-6">All notices are active. Archived notices will appear here.</p>
+            
+            <a href="/" class="inline-flex items-center gap-2 glass-morphism px-6 py-3 rounded-xl hover:bg-cyan-500/10 transition font-semibold">
+                <i data-lucide="arrow-left" class="w-5 h-5"></i>
+                Back to Dashboard
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+</main>
+
+<!-- Initialize Lucide Icons -->
+<script>
+    lucide.createIcons();
+</script>
+
+<!-- Canvas Particle Background -->
+<script>
+const canvas = document.getElementById("bgCanvas");
+const ctx = canvas.getContext("2d");
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+let particlesArray = [];
+
+class Particle {
+    constructor() {
+        this.x = Math.random() * canvas.width;
+        this.y = Math.random() * canvas.height;
+        this.size = Math.random() * 2 + 0.5;
+        this.speedX = Math.random() * 0.5 - 0.25;
+        this.speedY = Math.random() * 0.5 - 0.25;
+        this.opacity = Math.random() * 0.5 + 0.2;
+    }
+
+    update() {
+        this.x += this.speedX;
+        this.y += this.speedY;
+
+        if (this.x > canvas.width) this.x = 0;
+        if (this.x < 0) this.x = canvas.width;
+        if (this.y > canvas.height) this.y = 0;
+        if (this.y < 0) this.y = canvas.height;
+    }
+
+    draw() {
+        ctx.fillStyle = `rgba(245, 158, 11, ${this.opacity})`;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+function init() {
+    particlesArray = [];
+    for (let i = 0; i < 100; i++) {
+        particlesArray.push(new Particle());
+    }
+}
+
+function animateParticles() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (let i = 0; i < particlesArray.length; i++) {
+        particlesArray[i].update();
+        particlesArray[i].draw();
+    }
+    requestAnimationFrame(animateParticles);
+}
+
+window.addEventListener('resize', () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    init();
+});
+
+init();
+animateParticles();
+</script>
+
+<!-- Interactive Features -->
+<script>
+// Mobile Menu Toggle
+const menuToggle = document.getElementById('menuToggle');
+const sidebar = document.getElementById('sidebar');
+
+menuToggle.addEventListener('click', () => {
+    sidebar.classList.toggle('sidebar-hidden');
+});
+
+// Entrance Animation
+anime({
+    targets: '.notice-card',
+    translateY: [50, 0],
+    opacity: [0, 0.7],
+    delay: anime.stagger(100),
+    duration: 800,
+    easing: 'easeOutExpo'
+});
+</script>
+
+</body>
+</html>

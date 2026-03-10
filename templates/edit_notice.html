@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Edit Notice | Smart Notice Board</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Anime.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        * {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 50%, #0f1419 100%);
+            overflow-x: hidden;
+        }
+
+        .mono {
+            font-family: 'Space Mono', monospace;
+        }
+
+        #bgCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 0;
+            opacity: 0.3;
+        }
+
+        .sidebar {
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .sidebar-hidden {
+            transform: translateX(-100%);
+        }
+
+        @media (min-width: 768px) {
+            .sidebar-hidden {
+                transform: translateX(0);
+            }
+        }
+
+        .glass-morphism {
+            backdrop-filter: blur(10px);
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid rgba(100, 255, 218, 0.1);
+        }
+
+        .form-card {
+            backdrop-filter: blur(20px);
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(100, 255, 218, 0.2);
+        }
+
+        .input-field {
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid rgba(100, 255, 218, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .input-field:focus {
+            border-color: rgba(100, 255, 218, 0.5);
+            box-shadow: 0 0 20px rgba(100, 255, 218, 0.1);
+            outline: none;
+        }
+
+        .file-upload-area {
+            border: 2px dashed rgba(100, 255, 218, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .file-upload-area:hover {
+            border-color: rgba(100, 255, 218, 0.6);
+            background: rgba(100, 255, 218, 0.05);
+        }
+
+        .sidebar-link {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .sidebar-link::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 3px;
+            background: linear-gradient(180deg, #64ffda, #38bdf8);
+            transform: scaleY(0);
+            transition: transform 0.3s ease;
+        }
+
+        .sidebar-link:hover::before,
+        .sidebar-link.active::before {
+            transform: scaleY(1);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.5);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, #64ffda, #38bdf8);
+            border-radius: 10px;
+        }
+    </style>
+</head>
+
+<body class="text-white min-h-screen">
+
+<!-- Animated Canvas Background -->
+<canvas id="bgCanvas"></canvas>
+
+<!-- Mobile Menu Toggle -->
+<button id="menuToggle" class="md:hidden fixed top-4 left-4 z-50 p-3 rounded-xl glass-morphism hover:bg-cyan-500/20 transition">
+    <i data-lucide="menu" class="w-6 h-6"></i>
+</button>
+
+<!-- Sidebar -->
+<aside id="sidebar" class="sidebar fixed left-0 top-0 h-screen w-72 glass-morphism z-40 overflow-y-auto">
+    <div class="p-6">
+        <!-- Logo -->
+        <div class="flex items-center gap-3 mb-8">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center">
+                <i data-lucide="layout-dashboard" class="w-6 h-6 text-white"></i>
+            </div>
+            <div>
+                <h2 class="text-xl font-bold text-cyan-400 mono">SmartBoard</h2>
+                <p class="text-xs text-gray-400">Digital Notice Hub</p>
+            </div>
+        </div>
+
+        <!-- User Info -->
+        <div class="mb-6 p-4 rounded-xl bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border border-cyan-500/20">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center text-lg font-bold">
+                    {{ current_user.username[0].upper() }}
+                </div>
+                <div class="flex-1">
+                    <p class="font-semibold text-white">{{ current_user.username }}</p>
+                    <span class="text-xs px-2 py-1 rounded-full
+                        {% if current_user.role == 'admin' %}bg-red-500/20 text-red-300
+                        {% elif current_user.role == 'teacher' %}bg-green-500/20 text-green-300
+                        {% else %}bg-blue-500/20 text-blue-300{% endif %}">
+                        {{ current_user.role | capitalize }}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="space-y-2">
+            <a href="/" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-cyan-500/10 transition">
+                <i data-lucide="home" class="w-5 h-5"></i>
+                <span class="font-medium">Dashboard</span>
+            </a>
+
+            {% if current_user.role in ['admin', 'teacher'] %}
+            <a href="/post" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-cyan-500/10 transition">
+                <i data-lucide="plus-circle" class="w-5 h-5"></i>
+                <span class="font-medium">Post Notice</span>
+            </a>
+            {% endif %}
+
+            <a href="/my-notices" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-cyan-500/10 transition">
+                <i data-lucide="file-text" class="w-5 h-5"></i>
+                <span class="font-medium">My Notices</span>
+            </a>
+
+            <a href="/archive" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-cyan-500/10 transition">
+                <i data-lucide="archive" class="w-5 h-5"></i>
+                <span class="font-medium">Archive</span>
+            </a>
+
+            <a href="/calendar" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-cyan-500/10 transition">
+                <i data-lucide="calendar" class="w-5 h-5"></i>
+                <span class="font-medium">Calendar</span>
+            </a>
+
+            {% if current_user.role == 'admin' %}
+            <a href="/analytics" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-cyan-500/10 transition">
+                <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
+                <span class="font-medium">Analytics</span>
+            </a>
+
+            <a href="/users" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-cyan-500/10 transition">
+                <i data-lucide="users" class="w-5 h-5"></i>
+                <span class="font-medium">Manage Users</span>
+            </a>
+            {% endif %}
+
+            <a href="/settings" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-cyan-500/10 transition">
+                <i data-lucide="settings" class="w-5 h-5"></i>
+                <span class="font-medium">Settings</span>
+            </a>
+        </nav>
+
+        <!-- Tips Card -->
+        <div class="mt-8 p-4 rounded-xl bg-gradient-to-br from-yellow-500/10 to-orange-500/10 border border-yellow-500/20">
+            <h3 class="text-sm font-semibold text-yellow-300 mb-2 flex items-center gap-2">
+                <i data-lucide="info" class="w-4 h-4"></i>
+                Editing Notice
+            </h3>
+            <p class="text-xs text-gray-300">
+                Make your changes and click Update to save. All changes will be tracked.
+            </p>
+        </div>
+
+        <!-- Logout -->
+        <a href="/logout" class="mt-6 flex items-center gap-3 px-4 py-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 transition border border-red-500/20">
+            <i data-lucide="log-out" class="w-5 h-5"></i>
+            <span class="font-medium">Logout</span>
+        </a>
+    </div>
+</aside>
+
+<!-- Main Content -->
+<main class="md:ml-72 relative z-10 min-h-screen p-6">
+
+    <div class="max-w-5xl mx-auto">
+        
+        <!-- Header -->
+        <div class="mb-8">
+            <div class="flex items-center gap-3 mb-4">
+                <a href="/my-notices" class="p-2 rounded-xl glass-morphism hover:bg-cyan-500/20 transition">
+                    <i data-lucide="arrow-left" class="w-5 h-5"></i>
+                </a>
+                <div>
+                    <h1 class="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500">
+                        Edit Notice
+                    </h1>
+                    <p class="text-gray-400 mt-1">Update your notice information</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Form Container -->
+        <form action="/edit/{{ notice._id }}" method="POST" enctype="multipart/form-data" id="editForm" class="space-y-6">
+
+            <div class="grid md:grid-cols-3 gap-6">
+                
+                <!-- Left Column - Main Form -->
+                <div class="md:col-span-2 space-y-6">
+                    
+                    <!-- Title -->
+                    <div class="form-card p-6 rounded-2xl">
+                        <label class="flex items-center gap-2 text-sm font-semibold text-cyan-400 mb-3">
+                            <i data-lucide="heading" class="w-4 h-4"></i>
+                            Notice Title
+                        </label>
+                        <input type="text" 
+                               name="title" 
+                               id="titleInput"
+                               value="{{ notice.title }}"
+                               placeholder="Enter a clear, descriptive title..."
+                               maxlength="100"
+                               required
+                               class="input-field w-full p-4 rounded-xl text-white placeholder-gray-500">
+                        <div class="flex justify-between mt-2">
+                            <span class="text-xs text-gray-500">Make it catchy and informative</span>
+                            <span class="text-xs text-gray-400">
+                                <span id="titleCount">{{ notice.title|length }}</span>/100
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Message -->
+                    <div class="form-card p-6 rounded-2xl">
+                        <label class="flex items-center gap-2 text-sm font-semibold text-cyan-400 mb-3">
+                            <i data-lucide="align-left" class="w-4 h-4"></i>
+                            Message Content
+                        </label>
+                        <textarea name="message" 
+                                  id="messageInput"
+                                  rows="8" 
+                                  placeholder="Write your notice message here..."
+                                  maxlength="1000"
+                                  required
+                                  class="input-field w-full p-4 rounded-xl text-white placeholder-gray-500 resize-none">{{ notice.message }}</textarea>
+                        <div class="flex justify-between mt-2">
+                            <span class="text-xs text-gray-500">Provide all necessary details</span>
+                            <span class="text-xs text-gray-400">
+                                <span id="messageCount">{{ notice.message|length }}</span>/1000
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Current Files -->
+                    {% if notice.image or notice.pdf %}
+                    <div class="form-card p-6 rounded-2xl">
+                        <label class="flex items-center gap-2 text-sm font-semibold text-cyan-400 mb-3">
+                            <i data-lucide="paperclip" class="w-4 h-4"></i>
+                            Current Attachments
+                        </label>
+                        
+                        <div class="space-y-3">
+                            {% if notice.image %}
+                            <div class="flex items-center gap-3 p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20">
+                                <img src="{{ url_for('static', filename='uploads/' + notice.image) }}" 
+                                     class="w-16 h-16 rounded-lg object-cover">
+                                <div class="flex-1">
+                                    <p class="text-sm font-medium text-white">Current Image</p>
+                                    <p class="text-xs text-gray-400">{{ notice.image }}</p>
+                                </div>
+                                <i data-lucide="image" class="w-5 h-5 text-cyan-400"></i>
+                            </div>
+                            {% endif %}
+
+                            {% if notice.pdf %}
+                            <div class="flex items-center gap-3 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                                <div class="w-16 h-16 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                                    <i data-lucide="file-text" class="w-8 h-8 text-blue-400"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="text-sm font-medium text-white">Current PDF</p>
+                                    <p class="text-xs text-gray-400">{{ notice.pdf }}</p>
+                                </div>
+                                <a href="{{ url_for('static', filename='uploads/' + notice.pdf) }}" 
+                                   target="_blank"
+                                   class="text-blue-400 hover:text-blue-300">
+                                    <i data-lucide="external-link" class="w-5 h-5"></i>
+                                </a>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <p class="text-xs text-gray-500 mt-3">
+                            <i data-lucide="info" class="w-3 h-3 inline"></i>
+                            Upload new files below to replace current attachments
+                        </p>
+                    </div>
+                    {% endif %}
+
+                    <!-- File Uploads -->
+                    <div class="grid md:grid-cols-2 gap-6">
+                        
+                        <!-- Image Upload -->
+                        <div class="form-card p-6 rounded-2xl">
+                            <label class="flex items-center gap-2 text-sm font-semibold text-cyan-400 mb-3">
+                                <i data-lucide="image" class="w-4 h-4"></i>
+                                Upload New Image
+                            </label>
+                            <div class="file-upload-area rounded-xl p-6 text-center cursor-pointer" id="imageUploadArea">
+                                <input type="file" 
+                                       name="image" 
+                                       id="imageInput"
+                                       accept="image/*" 
+                                       class="hidden">
+                                <i data-lucide="upload-cloud" class="w-12 h-12 mx-auto mb-3 text-cyan-400"></i>
+                                <p class="text-sm text-gray-300 mb-1">Click to upload</p>
+                                <p class="text-xs text-gray-500">PNG, JPG up to 10MB</p>
+                            </div>
+                            <div id="imagePreviewContainer" class="mt-4 hidden">
+                                <img id="imagePreview" class="w-full h-40 object-cover rounded-xl border border-cyan-500/20">
+                                <button type="button" id="removeImage" class="mt-2 text-sm text-red-400 hover:text-red-300">
+                                    <i data-lucide="x" class="w-4 h-4 inline"></i> Remove
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- PDF Upload -->
+                        <div class="form-card p-6 rounded-2xl">
+                            <label class="flex items-center gap-2 text-sm font-semibold text-cyan-400 mb-3">
+                                <i data-lucide="file-text" class="w-4 h-4"></i>
+                                Upload New PDF
+                            </label>
+                            <div class="file-upload-area rounded-xl p-6 text-center cursor-pointer" id="pdfUploadArea">
+                                <input type="file" 
+                                       name="pdf" 
+                                       id="pdfInput"
+                                       accept="application/pdf" 
+                                       class="hidden">
+                                <i data-lucide="file" class="w-12 h-12 mx-auto mb-3 text-blue-400"></i>
+                                <p class="text-sm text-gray-300 mb-1">Click to upload</p>
+                                <p class="text-xs text-gray-500">PDF up to 10MB</p>
+                            </div>
+                            <div id="pdfPreviewContainer" class="mt-4 hidden">
+                                <div class="flex items-center gap-3 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                                    <i data-lucide="file-check" class="w-8 h-8 text-blue-400"></i>
+                                    <div class="flex-1">
+                                        <p id="pdfFileName" class="text-sm font-medium text-white"></p>
+                                        <p id="pdfFileSize" class="text-xs text-gray-400"></p>
+                                    </div>
+                                    <button type="button" id="removePdf" class="text-red-400 hover:text-red-300">
+                                        <i data-lucide="x" class="w-5 h-5"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <!-- Right Column - Settings -->
+                <div class="space-y-6">
+                    
+                    <!-- Category -->
+                    <div class="form-card p-6 rounded-2xl">
+                        <label class="flex items-center gap-2 text-sm font-semibold text-cyan-400 mb-3">
+                            <i data-lucide="tag" class="w-4 h-4"></i>
+                            Category
+                        </label>
+                        <select name="category" 
+                                id="categoryInput"
+                                class="input-field w-full p-3 rounded-xl text-white">
+                            <option value="General" {% if notice.category == 'General' %}selected{% endif %}>General</option>
+                            <option value="Academic" {% if notice.category == 'Academic' %}selected{% endif %}>Academic</option>
+                            <option value="Events" {% if notice.category == 'Events' %}selected{% endif %}>Events</option>
+                            <option value="Urgent" {% if notice.category == 'Urgent' %}selected{% endif %}>Urgent</option>
+                        </select>
+                    </div>
+
+                    <!-- Notice Info -->
+                    <div class="form-card p-6 rounded-2xl">
+                        <label class="flex items-center gap-2 text-sm font-semibold text-cyan-400 mb-3">
+                            <i data-lucide="info" class="w-4 h-4"></i>
+                            Notice Information
+                        </label>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between">
+                                <span class="text-gray-400">Posted by</span>
+                                <span class="text-cyan-300 font-medium">{{ notice.posted_by }}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-400">Posted on</span>
+                                <span class="text-white">{{ notice.date_posted.strftime('%d %b %Y') }}</span>
+                            </div>
+                            {% if notice.get('updated_at') %}
+                            <div class="flex justify-between">
+                                <span class="text-gray-400">Last updated</span>
+                                <span class="text-white">{{ notice.updated_at.strftime('%d %b %Y') }}</span>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="space-y-3">
+                        <button type="submit"
+                            class="w-full bg-gradient-to-r from-yellow-500 to-orange-500 px-6 py-4 rounded-xl font-semibold transition transform hover:scale-105 hover:shadow-lg hover:shadow-yellow-500/50 flex items-center justify-center gap-2">
+                            <i data-lucide="check" class="w-5 h-5"></i>
+                            Update Notice
+                        </button>
+
+                        <a href="/my-notices"
+                            class="w-full glass-morphism px-6 py-3 rounded-xl font-semibold hover:bg-gray-500/20 transition flex items-center justify-center gap-2">
+                            <i data-lucide="x" class="w-5 h-5"></i>
+                            Cancel
+                        </a>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</main>
+
+<!-- Initialize Lucide Icons -->
+<script>
+    lucide.createIcons();
+</script>
+
+<!-- Canvas Particle Background -->
+<script>
+const canvas = document.getElementById("bgCanvas");
+const ctx = canvas.getContext("2d");
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+let particlesArray = [];
+
+class Particle {
+    constructor() {
+        this.x = Math.random() * canvas.width;
+        this.y = Math.random() * canvas.height;
+        this.size = Math.random() * 2 + 0.5;
+        this.speedX = Math.random() * 0.5 - 0.25;
+        this.speedY = Math.random() * 0.5 - 0.25;
+        this.opacity = Math.random() * 0.5 + 0.2;
+    }
+
+    update() {
+        this.x += this.speedX;
+        this.y += this.speedY;
+
+        if (this.x > canvas.width) this.x = 0;
+        if (this.x < 0) this.x = canvas.width;
+        if (this.y > canvas.height) this.y = 0;
+        if (this.y < 0) this.y = canvas.height;
+    }
+
+    draw() {
+        ctx.fillStyle = `rgba(245, 158, 11, ${this.opacity})`;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+function init() {
+    particlesArray = [];
+    for (let i = 0; i < 80; i++) {
+        particlesArray.push(new Particle());
+    }
+}
+
+function animateParticles() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (let i = 0; i < particlesArray.length; i++) {
+        particlesArray[i].update();
+        particlesArray[i].draw();
+    }
+    requestAnimationFrame(animateParticles);
+}
+
+window.addEventListener('resize', () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    init();
+});
+
+init();
+animateParticles();
+</script>
+
+<!-- Interactive Features -->
+<script>
+// Mobile Menu Toggle
+const menuToggle = document.getElementById('menuToggle');
+const sidebar = document.getElementById('sidebar');
+
+menuToggle.addEventListener('click', () => {
+    sidebar.classList.toggle('sidebar-hidden');
+});
+
+// Character Count
+const titleInput = document.getElementById('titleInput');
+const messageInput = document.getElementById('messageInput');
+const titleCount = document.getElementById('titleCount');
+const messageCount = document.getElementById('messageCount');
+
+titleInput.addEventListener('input', () => {
+    titleCount.textContent = titleInput.value.length;
+});
+
+messageInput.addEventListener('input', () => {
+    messageCount.textContent = messageInput.value.length;
+});
+
+// Image Upload
+const imageUploadArea = document.getElementById('imageUploadArea');
+const imageInput = document.getElementById('imageInput');
+const imagePreview = document.getElementById('imagePreview');
+const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+const removeImage = document.getElementById('removeImage');
+
+imageUploadArea.addEventListener('click', () => imageInput.click());
+
+imageInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            imagePreview.src = e.target.result;
+            imagePreviewContainer.classList.remove('hidden');
+            imageUploadArea.style.display = 'none';
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+removeImage.addEventListener('click', () => {
+    imageInput.value = '';
+    imagePreviewContainer.classList.add('hidden');
+    imageUploadArea.style.display = 'block';
+});
+
+// PDF Upload
+const pdfUploadArea = document.getElementById('pdfUploadArea');
+const pdfInput = document.getElementById('pdfInput');
+const pdfPreviewContainer = document.getElementById('pdfPreviewContainer');
+const pdfFileName = document.getElementById('pdfFileName');
+const pdfFileSize = document.getElementById('pdfFileSize');
+const removePdf = document.getElementById('removePdf');
+
+pdfUploadArea.addEventListener('click', () => pdfInput.click());
+
+pdfInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        pdfFileName.textContent = file.name;
+        pdfFileSize.textContent = (file.size / 1024 / 1024).toFixed(2) + ' MB';
+        pdfPreviewContainer.classList.remove('hidden');
+        pdfUploadArea.style.display = 'none';
+    }
+});
+
+removePdf.addEventListener('click', () => {
+    pdfInput.value = '';
+    pdfPreviewContainer.classList.add('hidden');
+    pdfUploadArea.style.display = 'block';
+});
+
+// Entrance Animation
+anime({
+    targets: '.form-card',
+    translateY: [30, 0],
+    opacity: [0, 1],
+    delay: anime.stagger(100),
+    duration: 800,
+    easing: 'easeOutExpo'
+});
+</script>
+
+</body>
+</html>

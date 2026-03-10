@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Settings | Smart Notice Board</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Tailwind -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Anime.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        * {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 50%, #0f1419 100%);
+            overflow-x: hidden;
+        }
+
+        .mono {
+            font-family: 'Space Mono', monospace;
+        }
+
+        #bgCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 0;
+            opacity: 0.3;
+        }
+
+        .sidebar {
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .sidebar-hidden {
+            transform: translateX(-100%);
+        }
+
+        @media (min-width: 768px) {
+            .sidebar-hidden {
+                transform: translateX(0);
+            }
+        }
+
+        .glass-morphism {
+            backdrop-filter: blur(10px);
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid rgba(100, 255, 218, 0.1);
+        }
+
+        .form-card {
+            backdrop-filter: blur(20px);
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(100, 255, 218, 0.2);
+        }
+
+        .input-field {
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid rgba(100, 255, 218, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .input-field:focus {
+            border-color: rgba(100, 255, 218, 0.5);
+            box-shadow: 0 0 20px rgba(100, 255, 218, 0.1);
+            outline: none;
+        }
+
+        .sidebar-link {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .sidebar-link::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 3px;
+            background: linear-gradient(180deg, #64ffda, #38bdf8);
+            transform: scaleY(0);
+            transition: transform 0.3s ease;
+        }
+
+        .sidebar-link:hover::before,
+        .sidebar-link.active::before {
+            transform: scaleY(1);
+        }
+
+        .tab-button {
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .tab-button.active {
+            color: #64ffda;
+        }
+
+        .tab-button.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, #64ffda, #38bdf8);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.5);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, #64ffda, #38bdf8);
+            border-radius: 10px;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 48px;
+            height: 24px;
+            background: rgba(100, 255, 218, 0.2);
+            border-radius: 24px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .toggle-switch.active {
+            background: linear-gradient(90deg, #64ffda, #38bdf8);
+        }
+
+        .toggle-slider {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s ease;
+        }
+
+        .toggle-switch.active .toggle-slider {
+            transform: translateX(24px);
+        }
+    </style>
+</head>
+
+<body class="text-white min-h-screen">
+
+<!-- Animated Canvas Background -->
+<canvas id="bgCanvas"></canvas>
+
+<!-- Mobile Menu Toggle -->
+<button id="menuToggle" class="md:hidden fixed top-4 left-4 z-50 p-3 rounded-xl glass-morphism hover:bg-cyan-500/20 transition">
+    <i data-lucide="menu" class="w-6 h-6"></i>
+</button>
+
+<!-- Sidebar -->
+<aside id="sidebar" class="sidebar fixed left-0 top-0 h-screen w-72 glass-morphism z-40 overflow-y-auto">
+    <div class="p-6">
+        <!-- Logo -->
+        <div class="flex items-center gap-3 mb-8">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center">
+                <i data-lucide="layout-dashboard" class="w-6 h-6 text-white"></i>
+            </div>
+            <div>
+                <h2 class="text-xl font-bold text-cyan-400 mono">SmartBoard</h2>
+                <p class="text-xs text-gray-400">Digital Notice Hub</p>
+            </div>
+        </div>
+
+        <!-- User Info -->
+        <div class="mb-6 p-4 rounded-xl bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border border-cyan-500/20">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center text-lg font-bold">
+                    {{ user.username[0].upper() }}
+                </div>
+                <div class="flex-1">
+                    <p class="font-semibold text-white">{{ user.username }}</p>
+                    <span class="text-xs px-2 py-1 rounded-full
+                        {% if user.role == 'admin' %}bg-red-500/20 text-red-300
+                        {% elif user.role == 'teacher' %}bg-green-500/20 text-green-300
+                        {% else %}bg-blue-500/20 text-blue-300{% endif %}">
+                        {{ user.role | capitalize }}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="space-y-2">
+            <a href="/" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-cyan-500/10 transition">
+                <i data-lucide="home" class="w-5 h-5"></i>
+                <span class="font-medium">Dashboard</span>
+            </a>
+
+            {% if current_user.role in ['admin', 'teacher'] %}
+            <a href="/post" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-cyan-500/10 transition">
+                <i data-lucide="plus-circle" class="w-5 h-5"></i>
+                <span class="font-medium">Post Notice</span>
+            </a>
+            {% endif %}
+
+            <a href="/my-notices" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-cyan-500/10 transition">
+                <i data-lucide="file-text" class="w-5 h-5"></i>
+                <span class="font-medium">My Notices</span>
+            </a>
+
+            <a href="/archive" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-cyan-500/10 transition">
+                <i data-lucide="archive" class="w-5 h-5"></i>
+                <span class="font-medium">Archive</span>
+            </a>
+
+            <a href="/calendar" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-cyan-500/10 transition">
+                <i data-lucide="calendar" class="w-5 h-5"></i>
+                <span class="font-medium">Calendar</span>
+            </a>
+
+            {% if current_user.role == 'admin' %}
+            <a href="/analytics" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-cyan-500/10 transition">
+                <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
+                <span class="font-medium">Analytics</span>
+            </a>
+
+            <a href="/users" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-cyan-500/10 transition">
+                <i data-lucide="users" class="w-5 h-5"></i>
+                <span class="font-medium">Manage Users</span>
+            </a>
+            {% endif %}
+
+            <a href="/settings" class="sidebar-link active flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-cyan-500/10 transition">
+                <i data-lucide="settings" class="w-5 h-5"></i>
+                <span class="font-medium">Settings</span>
+            </a>
+        </nav>
+
+        <!-- Account Info -->
+        <div class="mt-8 p-4 rounded-xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/20">
+            <h3 class="text-sm font-semibold text-gray-300 mb-3 flex items-center gap-2">
+                <i data-lucide="info" class="w-4 h-4"></i>
+                Account Info
+            </h3>
+            <div class="space-y-2 text-xs">
+                <div class="flex justify-between">
+                    <span class="text-gray-400">Joined</span>
+                    <span class="text-white">{{ user.created_at.strftime('%d %b %Y') }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-400">Role</span>
+                    <span class="text-cyan-300">{{ user.role | capitalize }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Logout -->
+        <a href="/logout" class="mt-6 flex items-center gap-3 px-4 py-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 transition border border-red-500/20">
+            <i data-lucide="log-out" class="w-5 h-5"></i>
+            <span class="font-medium">Logout</span>
+        </a>
+    </div>
+</aside>
+
+<!-- Main Content -->
+<main class="md:ml-72 relative z-10 min-h-screen p-6">
+
+    <div class="max-w-5xl mx-auto">
+        
+        <!-- Header -->
+        <div class="mb-8">
+            <h1 class="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 mb-2">
+                Settings
+            </h1>
+            <p class="text-gray-400">Manage your account and preferences</p>
+        </div>
+
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div class="mb-6 p-4 rounded-xl bg-green-500/20 border border-green-500/30 text-green-300">
+                    <i data-lucide="check-circle" class="w-5 h-5 inline mr-2"></i>
+                    {{ messages[0] }}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <!-- Tabs -->
+        <div class="flex gap-4 mb-6 border-b border-slate-700">
+            <button class="tab-button active px-4 py-3 font-semibold" data-tab="profile">
+                <i data-lucide="user" class="w-4 h-4 inline mr-2"></i>
+                Profile
+            </button>
+            <button class="tab-button px-4 py-3 font-semibold text-gray-400" data-tab="security">
+                <i data-lucide="shield" class="w-4 h-4 inline mr-2"></i>
+                Security
+            </button>
+            <button class="tab-button px-4 py-3 font-semibold text-gray-400" data-tab="preferences">
+                <i data-lucide="sliders" class="w-4 h-4 inline mr-2"></i>
+                Preferences
+            </button>
+        </div>
+
+        <!-- Profile Tab -->
+        <div id="profileTab" class="tab-content">
+            <form method="POST" class="space-y-6">
+
+                <div class="grid md:grid-cols-2 gap-6">
+                    
+                    <!-- Profile Information -->
+                    <div class="form-card p-6 rounded-2xl">
+                        <h3 class="text-xl font-bold text-cyan-400 mb-4 flex items-center gap-2">
+                            <i data-lucide="user" class="w-5 h-5"></i>
+                            Profile Information
+                        </h3>
+
+                        <div class="space-y-4">
+                            <!-- Username -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-300 mb-2">Username</label>
+                                <input type="text" 
+                                       name="username" 
+                                       value="{{ user.username }}"
+                                       class="input-field w-full p-3 rounded-xl text-white"
+                                       placeholder="Enter username">
+                            </div>
+
+                            <!-- Email -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-300 mb-2">Email</label>
+                                <input type="email" 
+                                       name="email" 
+                                       value="{{ user.email }}"
+                                       class="input-field w-full p-3 rounded-xl text-white"
+                                       placeholder="Enter email">
+                            </div>
+
+                            <!-- Role (Read-only) -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-300 mb-2">Role</label>
+                                <input type="text" 
+                                       value="{{ user.role | capitalize }}"
+                                       class="input-field w-full p-3 rounded-xl text-gray-400 cursor-not-allowed"
+                                       disabled>
+                                <p class="text-xs text-gray-500 mt-1">Contact admin to change your role</p>
+                            </div>
+                        </div>
+
+                        <button type="submit" 
+                                class="w-full mt-6 bg-gradient-to-r from-cyan-500 to-blue-500 px-6 py-3 rounded-xl font-semibold transition transform hover:scale-105 hover:shadow-lg hover:shadow-cyan-500/50 flex items-center justify-center gap-2">
+                            <i data-lucide="save" class="w-5 h-5"></i>
+                            Update Profile
+                        </button>
+                    </div>
+
+                    <!-- Profile Avatar -->
+                    <div class="form-card p-6 rounded-2xl">
+                        <h3 class="text-xl font-bold text-cyan-400 mb-4 flex items-center gap-2">
+                            <i data-lucide="image" class="w-5 h-5"></i>
+                            Profile Avatar
+                        </h3>
+
+                        <div class="flex flex-col items-center">
+                            <div class="w-32 h-32 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center text-5xl font-bold mb-4">
+                                {{ user.username[0].upper() }}
+                            </div>
+
+                            <p class="text-gray-400 text-sm mb-4 text-center">Your profile uses the first letter of your username</p>
+
+                            <div class="w-full space-y-2">
+                                <div class="flex items-center justify-between p-3 rounded-xl bg-slate-800/50">
+                                    <span class="text-sm text-gray-300">Username</span>
+                                    <span class="text-cyan-400 font-medium">{{ user.username }}</span>
+                                </div>
+                                <div class="flex items-center justify-between p-3 rounded-xl bg-slate-800/50">
+                                    <span class="text-sm text-gray-300">Email</span>
+                                    <span class="text-cyan-400 font-medium">{{ user.email }}</span>
+                                </div>
+                                <div class="flex items-center justify-between p-3 rounded-xl bg-slate-800/50">
+                                    <span class="text-sm text-gray-300">Member Since</span>
+                                    <span class="text-cyan-400 font-medium">{{ user.created_at.strftime('%b %Y') }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </form>
+        </div>
+
+        <!-- Security Tab -->
+        <div id="securityTab" class="tab-content hidden">
+            <form method="POST" class="space-y-6">
+
+                <div class="form-card p-6 rounded-2xl max-w-2xl">
+                    <h3 class="text-xl font-bold text-cyan-400 mb-4 flex items-center gap-2">
+                        <i data-lucide="lock" class="w-5 h-5"></i>
+                        Change Password
+                    </h3>
+
+                    <div class="space-y-4">
+                        <!-- Current Password -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Current Password</label>
+                            <input type="password" 
+                                   name="current_password" 
+                                   class="input-field w-full p-3 rounded-xl text-white"
+                                   placeholder="Enter current password">
+                        </div>
+
+                        <!-- New Password -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">New Password</label>
+                            <input type="password" 
+                                   name="new_password" 
+                                   id="newPassword"
+                                   class="input-field w-full p-3 rounded-xl text-white"
+                                   placeholder="Enter new password">
+                        </div>
+
+                        <!-- Confirm New Password -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Confirm New Password</label>
+                            <input type="password" 
+                                   name="confirm_password" 
+                                   id="confirmPassword"
+                                   class="input-field w-full p-3 rounded-xl text-white"
+                                   placeholder="Confirm new password">
+                        </div>
+
+                        <!-- Password Requirements -->
+                        <div class="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                            <p class="text-sm text-blue-300 mb-2 font-medium">
+                                <i data-lucide="info" class="w-4 h-4 inline mr-1"></i>
+                                Password Requirements:
+                            </p>
+                            <ul class="text-xs text-gray-300 space-y-1 ml-5">
+                                <li>• At least 8 characters long</li>
+                                <li>• Include uppercase and lowercase letters</li>
+                                <li>• Include at least one number</li>
+                                <li>• Include at least one special character</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <button type="submit" 
+                            class="w-full mt-6 bg-gradient-to-r from-yellow-500 to-orange-500 px-6 py-3 rounded-xl font-semibold transition transform hover:scale-105 hover:shadow-lg hover:shadow-yellow-500/50 flex items-center justify-center gap-2">
+                        <i data-lucide="key" class="w-5 h-5"></i>
+                        Change Password
+                    </button>
+                </div>
+
+            </form>
+        </div>
+
+        <!-- Preferences Tab -->
+        <div id="preferencesTab" class="tab-content hidden">
+            <div class="space-y-6">
+
+                <!-- Notifications -->
+                <div class="form-card p-6 rounded-2xl">
+                    <h3 class="text-xl font-bold text-cyan-400 mb-4 flex items-center gap-2">
+                        <i data-lucide="bell" class="w-5 h-5"></i>
+                        Notifications
+                    </h3>
+
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between p-4 rounded-xl bg-slate-800/50">
+                            <div>
+                                <p class="font-medium text-white">Email Notifications</p>
+                                <p class="text-sm text-gray-400">Receive email updates for new notices</p>
+                            </div>
+                            <div class="toggle-switch active" onclick="this.classList.toggle('active')">
+                                <div class="toggle-slider"></div>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between p-4 rounded-xl bg-slate-800/50">
+                            <div>
+                                <p class="font-medium text-white">Push Notifications</p>
+                                <p class="text-sm text-gray-400">Get browser push notifications</p>
+                            </div>
+                            <div class="toggle-switch active" onclick="this.classList.toggle('active')">
+                                <div class="toggle-slider"></div>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between p-4 rounded-xl bg-slate-800/50">
+                            <div>
+                                <p class="font-medium text-white">Weekly Digest</p>
+                                <p class="text-sm text-gray-400">Summary of weekly notices</p>
+                            </div>
+                            <div class="toggle-switch" onclick="this.classList.toggle('active')">
+                                <div class="toggle-slider"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Display -->
+                <div class="form-card p-6 rounded-2xl">
+                    <h3 class="text-xl font-bold text-cyan-400 mb-4 flex items-center gap-2">
+                        <i data-lucide="monitor" class="w-5 h-5"></i>
+                        Display
+                    </h3>
+
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between p-4 rounded-xl bg-slate-800/50">
+                            <div>
+                                <p class="font-medium text-white">Compact View</p>
+                                <p class="text-sm text-gray-400">Show more notices per page</p>
+                            </div>
+                            <div class="toggle-switch" onclick="this.classList.toggle('active')">
+                                <div class="toggle-slider"></div>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between p-4 rounded-xl bg-slate-800/50">
+                            <div>
+                                <p class="font-medium text-white">Show Animations</p>
+                                <p class="text-sm text-gray-400">Enable UI animations and effects</p>
+                            </div>
+                            <div class="toggle-switch active" onclick="this.classList.toggle('active')">
+                                <div class="toggle-slider"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Privacy -->
+                <div class="form-card p-6 rounded-2xl">
+                    <h3 class="text-xl font-bold text-cyan-400 mb-4 flex items-center gap-2">
+                        <i data-lucide="shield-check" class="w-5 h-5"></i>
+                        Privacy
+                    </h3>
+
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between p-4 rounded-xl bg-slate-800/50">
+                            <div>
+                                <p class="font-medium text-white">Show Profile</p>
+                                <p class="text-sm text-gray-400">Make your profile visible to others</p>
+                            </div>
+                            <div class="toggle-switch active" onclick="this.classList.toggle('active')">
+                                <div class="toggle-slider"></div>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between p-4 rounded-xl bg-slate-800/50">
+                            <div>
+                                <p class="font-medium text-white">Activity Status</p>
+                                <p class="text-sm text-gray-400">Show when you're online</p>
+                            </div>
+                            <div class="toggle-switch active" onclick="this.classList.toggle('active')">
+                                <div class="toggle-slider"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="w-full bg-gradient-to-r from-cyan-500 to-blue-500 px-6 py-3 rounded-xl font-semibold transition transform hover:scale-105 hover:shadow-lg hover:shadow-cyan-500/50 flex items-center justify-center gap-2">
+                    <i data-lucide="save" class="w-5 h-5"></i>
+                    Save Preferences
+                </button>
+
+            </div>
+        </div>
+
+    </div>
+
+</main>
+
+<!-- Initialize Lucide Icons -->
+<script>
+    lucide.createIcons();
+</script>
+
+<!-- Canvas Particle Background -->
+<script>
+const canvas = document.getElementById("bgCanvas");
+const ctx = canvas.getContext("2d");
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+let particlesArray = [];
+
+class Particle {
+    constructor() {
+        this.x = Math.random() * canvas.width;
+        this.y = Math.random() * canvas.height;
+        this.size = Math.random() * 2 + 0.5;
+        this.speedX = Math.random() * 0.5 - 0.25;
+        this.speedY = Math.random() * 0.5 - 0.25;
+        this.opacity = Math.random() * 0.5 + 0.2;
+    }
+
+    update() {
+        this.x += this.speedX;
+        this.y += this.speedY;
+
+        if (this.x > canvas.width) this.x = 0;
+        if (this.x < 0) this.x = canvas.width;
+        if (this.y > canvas.height) this.y = 0;
+        if (this.y < 0) this.y = canvas.height;
+    }
+
+    draw() {
+        ctx.fillStyle = `rgba(100, 255, 218, ${this.opacity})`;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+function init() {
+    particlesArray = [];
+    for (let i = 0; i < 80; i++) {
+        particlesArray.push(new Particle());
+    }
+}
+
+function animateParticles() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (let i = 0; i < particlesArray.length; i++) {
+        particlesArray[i].update();
+        particlesArray[i].draw();
+    }
+    requestAnimationFrame(animateParticles);
+}
+
+window.addEventListener('resize', () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    init();
+});
+
+init();
+animateParticles();
+</script>
+
+<!-- Interactive Features -->
+<script>
+// Mobile Menu Toggle
+const menuToggle = document.getElementById('menuToggle');
+const sidebar = document.getElementById('sidebar');
+
+menuToggle.addEventListener('click', () => {
+    sidebar.classList.toggle('sidebar-hidden');
+});
+
+// Tab Switching
+const tabButtons = document.querySelectorAll('.tab-button');
+const profileTab = document.getElementById('profileTab');
+const securityTab = document.getElementById('securityTab');
+const preferencesTab = document.getElementById('preferencesTab');
+
+tabButtons.forEach(button => {
+    button.addEventListener('click', () => {
+        const tab = button.dataset.tab;
+        
+        // Update active state
+        tabButtons.forEach(btn => btn.classList.remove('active', 'text-cyan-400'));
+        tabButtons.forEach(btn => btn.classList.add('text-gray-400'));
+        button.classList.add('active', 'text-cyan-400');
+        button.classList.remove('text-gray-400');
+        
+        // Switch tabs
+        profileTab.classList.add('hidden');
+        securityTab.classList.add('hidden');
+        preferencesTab.classList.add('hidden');
+        
+        if (tab === 'profile') {
+            profileTab.classList.remove('hidden');
+        } else if (tab === 'security') {
+            securityTab.classList.remove('hidden');
+        } else if (tab === 'preferences') {
+            preferencesTab.classList.remove('hidden');
+        }
+        
+        lucide.createIcons();
+    });
+});
+
+// Password Match Validation
+const newPassword = document.getElementById('newPassword');
+const confirmPassword = document.getElementById('confirmPassword');
+
+if (newPassword && confirmPassword) {
+    confirmPassword.addEventListener('input', () => {
+        if (confirmPassword.value !== newPassword.value) {
+            confirmPassword.style.borderColor = 'rgba(239, 68, 68, 0.5)';
+        } else {
+            confirmPassword.style.borderColor = 'rgba(34, 197, 94, 0.5)';
+        }
+    });
+}
+
+// Entrance Animation
+anime({
+    targets: '.form-card',
+    translateY: [30, 0],
+    opacity: [0, 1],
+    delay: anime.stagger(100),
+    duration: 800,
+    easing: 'easeOutExpo'
+});
+</script>
+
+</body>
+</html>
