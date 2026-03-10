@@ -14,7 +14,7 @@ app.secret_key = "supersecretkey"
 
 # ---------------- MongoDB Setup ----------------
 MONGO_URI = os.getenv("MONGO_URI")
-client = MongoClient(MONGO_URI )
+client = MongoClient(MONGO_URI)
 db = client["smart_notice_board"]
 users_collection = db["users"]
 notices_collection = db["notices"]
